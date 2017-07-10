@@ -7,11 +7,11 @@ import matplotlib.pyplot as plt
 
 
 class fm(object):
-    def __init__(self,train_x_data,train_y_data,val_x_data,val_y_data):
-        self.train_x_data = train_x_data
-        self.train_y_data = train_y_data
-        self.val_x_data = val_x_data
-        self.val_y_data = val_y_data
+    def __init__(self,datafile,data_x_dim,data_y_dim):
+        self.train_x_data = self.get_train_x_data(datafile,data_x_dim,data_y_dim)
+        self.train_y_data = self.get_train_y_data(datafile)
+        self.val_x_data = self.train_x_data
+        self.val_y_data = self.train_y_data
 
     #预测
     def cal_y(self,model,index):
@@ -30,7 +30,8 @@ class fm(object):
 
                     sum_xij += d_valuer*v_valuer
 
-        return y + sum_xij+ sum(abs(W)*lambd)
+        return y + sum_xij
+
 
     #对V向量进行求偏导
     def cal_dv(self,model, lineData):
@@ -40,7 +41,11 @@ class fm(object):
             sum_vjxj = np.sum(V[f] * lineData)
             for i in xrange(len(lineData)):
                 dv[f][i] = lineData[i] * sum_vjxj - V[f][i] * np.square(lineData[i])
-        return dv+lambd
+                if dv[f][i]>0:
+                    dv[f][i] = dv[f][i] + lambd
+                else:
+                    dv[f][i] = dv[f][i] - lambd
+        return dv
 
         # dv = np.ones_like(v)
         # sum123 = 0
@@ -55,7 +60,7 @@ class fm(object):
     #目标函数最小二乘法
     def calculate_loss(self,model, index):
         W, W0, V, lambd = model['W'], model['W0'], model['V'],model['lambd']
-        return np.square(self.train_y_data[index] - self.cal_y(model, index)) * .5+sum(abs(W)*lambd)
+        return np.square(self.train_y_data[index] - self.cal_y(model, index)) * .5 +sum(abs(W)*lambd)
 
 
     #训练模型
@@ -71,7 +76,7 @@ class fm(object):
         W = np.random.randn(dim_data) / np.sqrt(dim_data)
         V = np.random.randn(dim_k, dim_data) / np.sqrt(dim_data)
         W0 = 1
-        lambd = .1
+        lambd = 0
         learnRate = .01
 
         print "\nW:", W, "\nV:", V, "\nW0:", W0
@@ -86,15 +91,30 @@ class fm(object):
             # print "\n ----------cal_y:",self.cal_y(model, data_index),"   y:",self.train_y_data[data_index]
 
             # print "\ny_yx:",y_yx
-            dW0 = y_yx * W0
+            # dW0 = y_yx * W0
+            if W0>0 :
+                dW0 = y_yx * W0 * (1 + lambd)
+            else:
+                dW0 = y_yx * W0 * (1 - lambd)
 
-            dW = y_yx * iterData + lambd
+
+            # dW = y_yx * iterData
+            dW =[]
+            for j in iterData:
+                if j >0:
+                    dW.append(y_yx *(j+lambd))
+                else:
+                    dW.append(y_yx *(j -lambd))
+
             dV = y_yx * self.cal_dv(model, iterData)
 
+            sum_para =W0**2+np.sum(np.square(dW))+np.sum(np.square(dV))
+            sum_para =1
+
             # updata weights
-            W0 -= dW0 * learnRate
-            V -= dV * learnRate
-            W -= dW * learnRate
+            W0 -= dW0 * learnRate/np.sqrt(sum_para)
+            V -= dV * learnRate/np.sqrt(sum_para)
+            W -= np.array(dW) * learnRate/np.sqrt(sum_para)
             model = {'W': W, 'W0': W0, 'V': V, 'lambd': lambd}
 
             # print "-------------------\nmodel:",model
@@ -107,6 +127,7 @@ class fm(object):
                 print "===========Loss after iteration %i: %f" % (i, current_loss)
 
                 if abs(current_loss-old_loss)/current_loss <= 0.05:
+                    # break
                     pass;
                 old_loss = current_loss
 
@@ -132,6 +153,29 @@ class fm(object):
             data.append(self.getEpitriquetrum(matrix[i] * matrix[i].reshape(-1, 1)))
 
         return np.c_[matrix, data]
+    #从one hot 编码数据获得训练数据
+    def get_train_x_data(self,data_path,x_dim,ydim):
+        x = np.zeros((x_dim, ydim))
+        for i, d in enumerate(file(path)):
+            d = d.strip()
+            if not d:
+                continue
+            d = map(str, d.split(' '))[1:]
+            for data in d:
+                x[i][int(data.split(":")[0])] = 1
+        return x
+
+    # 从one hot 编码数据获得训练数据
+    def get_train_y_data(self,data_path):
+        y=[]
+
+        for i, d in enumerate(file(data_path)):
+            d = d.strip()
+            if not d:
+                continue
+            d = map(str, d.split(' '))[0]
+            y.append(d)
+        return np.array(y).astype(dtype=np.int)
 
 if __name__=='__main__':
     '''样本数据 Y,X1,X2'''
@@ -141,13 +185,21 @@ if __name__=='__main__':
     #     [1, 0, 0],print "\n\n\n\n"
     #     [1, 1, 0]
     # ])
-    Data = np.random.randint(0,2,(10,10))
-    print "\nData:",Data
-    X = Data[:, :-1]
-    Y = Data[:, -1]
+
+    path = '/Users/bruce/Documents/one_hot_criteo_10w.txt'
+    x_axis = 100000
+    y_axis = 8000000
+    train =   fm(path,x_axis,y_axis)
+    print "xdata[0][255]:",train.train_x_data[0][255],"xdata[0][256]:",train.train_x_data[0][256]
+    # Data = np.random.randint(0,2,(3000,10))
+    # print "\nData:",Data
     #
-    train = fm(X,Y,X,Y)
-    train.build_model(10,10001,True)
+    #
+    # X = Data[:, :-1]
+    # Y = Data[:, -1]
+    # #
+    # train = fm(X,Y,X,Y)
+    train.build_model(10,3001,True)
 
 
 
