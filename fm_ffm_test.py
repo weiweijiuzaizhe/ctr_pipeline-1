@@ -21,9 +21,9 @@ class fm(object):
     @data_x_dim:总行数
     @data_y_dim:总列数
     '''
-    def __init__(self,datafile,data_x_dim,data_y_dim):
-        self.train_x_data = self.get_train_x_data_decodeOneHot(datafile,data_x_dim,data_y_dim)
-        self.train_y_data = self.get_train_y_data_decodeOneHot(datafile)
+    def __init__(self,data):
+        self.train_x_data = data[:,1:]
+        self.train_y_data = data[:,0]
         self.val_x_data = self.train_x_data
         self.val_y_data = self.train_y_data
 
@@ -34,21 +34,20 @@ class fm(object):
     @return: 返回计算后的预估值
     '''
     def cal_y(self,model,index):
-        if onehot_model==False:
-            data = self.train_x_data[index]
-            W, W0, V, lambd = model['W'], model['W0'], model['V'], model['lambd']
-            y = W0 + np.sum(W * data)#y= w0 + Σ(wi*xi)
-            sum_xij = 0
-            for i in range(len(dd) - 1):
-                for j in np.arange(i + 1, len(data), 1):
-                    if data[i] != 0 and data[j] != 0:
-                        # sum_xij += dd[i] * dd[j] * (V.T[i].dot(V.T[j]))
-                        d_valuer = data[i] * data[j]
-                        v_valuer = np.sum(V[:, i] * V[:, j])
+        data = self.train_x_data[index]
+        W, W0, V, lambd = model['W'], model['W0'], model['V'], model['lambd']
+        y = W0 + np.sum(W * data)#y= w0 + Σ(wi*xi)
+        sum_xij = 0
+        for i in range(len(data) - 1):
+            for j in np.arange(i + 1, len(data), 1):
+                if data[i] != 0 and data[j] != 0:
+                    # sum_xij += dd[i] * dd[j] * (V.T[i].dot(V.T[j]))
+                    d_valuer = data[i] * data[j]
+                    v_valuer = np.sum(V[:, i] * V[:, j])
 
-                        sum_xij += d_valuer*v_valuer
+                    sum_xij += d_valuer*v_valuer
 
-            return y + sum_xij#y= w0 + Σ(wi*xi) +ΣΣ<vi,vj>xixj
+        return y + sum_xij#y= w0 + Σ(wi*xi) +ΣΣ<vi,vj>xixj
 
     '''
    说明：对V向量进行求偏导 dv =xi∑vj,f*xj -vi,f xi²
@@ -130,28 +129,18 @@ class fm(object):
 
             dV = y_yx * self.cal_dv(model, iterData)
 
-            sum_para =W0**2+np.sum(np.square(dW))+np.sum(np.square(dV))
-            sum_para =1
 
             # updata weights
-            W0 -= dW0 * learnRate/np.sqrt(sum_para)
-            V -= dV * learnRate/np.sqrt(sum_para)
-            W -= np.array(dW) * learnRate/np.sqrt(sum_para)
+            W0 -= dW0 * learnRate
+            V -= dV * learnRate
+            W -= np.array(dW) * learnRate
             model = {'W': W, 'W0': W0, 'V': V, 'lambd': lambd}
 
             # print "-------------------\nmodel:",model
-            # if print_loss and i % 100 == 0:
+            if print_loss and i % 100 == 0:
+                print "===========Loss after iteration %i: %f" % (i, self.calculate_loss(model, data_index))
 
-            if print_loss :
-                current_loss = self.calculate_loss(model, data_index)
 
-                # print "\n model:",model
-                print "===========Loss after iteration %i: %f" % (i, current_loss)
-
-                if abs(current_loss-old_loss)/current_loss <= 0.05:
-                    # break
-                    pass;
-                old_loss = current_loss
 
         return model
 
@@ -353,7 +342,7 @@ class fm_oneHot(object):
     '''
     def get_train_x_data(self,data_path):
         x = []
-        for i, d in enumerate(file(path)):
+        for i, d in enumerate(file(data_path)):
             d = d.strip()
             if not d:
                 continue
@@ -378,40 +367,18 @@ class fm_oneHot(object):
             y.append(d)
         return np.array(y).astype(dtype=np.int)
 
-
-if __name__=='__main__':
-    '''样本数据 Y,X1,X2'''
-    # Data = np.array([
-    #     [1, 0, 1],
-    #     [0, 1, 1],
-    #     [1, 0, 0],print "\n\n\n\n"
-    #     [1, 1, 0]
-    # ])
-
-    # y = []
-    #
-    # for i, d in enumerate(file(path)):
-    #     d = d.strip()
-    #     if not d:
-    #         continue
-    #     d = map(str, d.split(' '))[0]
-    #     y.append(d)
-    #
-    # print len(np.array(y).astype(dtype=np.int))
-
-    # x_axis = 100000
-    # y_axis = 8000000
-    # train =   fm(path,x_axis,y_axis)
-    # print "xdata[0][255]:",train.train_x_data[0][255],"xdata[0][256]:",train.train_x_data[0][256]
-    # # Data = np.random.randint(0,2,(3000,10))
-    # # print "\nData:",Data
-    # #
-    # #
-    # # X = Data[:, :-1]
-    # # Y = Data[:, -1]
-    # # #
+def test_fmonehot():
     path = '/Users/bruce/Documents/one_hot_criteo_10w.txt'
     train = fm_oneHot(path)
     train.build_model(1,3001,True)
+def test_fm():
+    k_dim=1
+    featureNum=100
+    dataRows=10
+    data = np.random.randint(0,2,(dataRows,featureNum+1))#col 0:y, col1~featureNum+1:x
+    train = fm(data)
+    train.build_model(k_dim,2001,True)
 
-
+if __name__=='__main__':
+    # test_fmonehot()
+    test_fm()
