@@ -47,6 +47,7 @@ class fm(object):
 
                     sum_xij += d_valuer*v_valuer
 
+
         return y + sum_xij#y= w0 + Σ(wi*xi) +ΣΣ<vi,vj>xixj
 
     '''
@@ -85,7 +86,7 @@ class fm(object):
     @param print_loss：是否打印出损失值，True:是，False:否
     @return: 返回完成训练的模型
     '''
-    def build_model(self, dim_k, num_passes=20000, print_loss=False):
+    def build_model(self, lr,dim_k, num_passes=20000, print_loss=False):
         '''
         参数：
         1) dim_k :   V向量长度
@@ -98,7 +99,7 @@ class fm(object):
         V = np.random.randn(dim_k, dim_data) / np.sqrt(dim_data)
         W0 = 1
         lambd = 0
-        learnRate = .01
+        learnRate = lr
 
         print "\nW:", W, "\nV:", V, "\nW0:", W0
         model = {'W': W, 'W0': W0, 'V': V,'lambd':lambd}
@@ -138,7 +139,10 @@ class fm(object):
 
             # print "-------------------\nmodel:",model
             if print_loss and i % 100 == 0:
-                print "===========Loss after iteration %i: %f" % (i, self.calculate_loss(model, data_index))
+                loss = self.calculate_loss(model, data_index)
+                pre_y = self.cal_y(model, data_index)
+                # print "\n model:",model
+                print "===========Loss after iteration %i: %f y=%i pre=%f" % ( i, loss, self.train_y_data[data_index], pre_y)
 
 
 
@@ -324,9 +328,10 @@ class fm_oneHot(object):
 
             if print_loss :
                 current_loss = self.calculate_loss(model, data_index)
-
+                pre_y = self.cal_y(model, data_index)
                 # print "\n model:",model
-                print "===========Loss after iteration %i: %f" % (i, current_loss)
+                print "===========Loss after iteration %i: %f y=%i pre=%f" % (i, current_loss,self.train_y_data[data_index],pre_y)
+
 
                 if abs(current_loss-old_loss)/current_loss <= 0.05:
                     # break
@@ -377,7 +382,8 @@ def test_fm():
     dataRows=10
     data = np.random.randint(0,2,(dataRows,featureNum+1))#col 0:y, col1~featureNum+1:x
     train = fm(data)
-    train.build_model(k_dim,2001,True)
+    lr=0.001
+    train.build_model(lr,k_dim,2001,True)
 
 if __name__=='__main__':
     # test_fmonehot()
